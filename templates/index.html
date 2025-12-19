@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manufacturing Planner</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+  <header class="text-center mb-4">
+    <img src="https://placehold.co/200x50/ab47bc/white?text=Manufacturing+Logo" alt="Logo" class="img-fluid">
+  </header>
+  <div class="container mt-4">
+    <h1 class="text-center mb-4 text-primary">Bay 4 M2M Daily Planner</h1>
+
+    <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+      <li class="nav-item">
+        <a class="nav-link active" id="attendance-tab" data-bs-toggle="tab" href="#attendance" role="tab">Attendance</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="production-tab" data-bs-toggle="tab" href="#production" role="tab">Production Plan</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="efficiency-tab" data-bs-toggle="tab" href="#efficiency" role="tab">Efficiency Calculator</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="material-tab" data-bs-toggle="tab" href="#material" role="tab">Material Consumption</a>
+      </li>
+    </ul>
+
+    <div class="tab-content">
+      <div class="tab-pane fade show active" id="attendance">
+        <h3>Mark Today's Attendance</h3>
+        <form id="attendanceForm">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label for="attendanceDate" class="form-label">Date</label>
+              <input type="date" class="form-control" id="attendanceDate" required>
+            </div>
+            <div class="col-md-6">
+              <label for="attendanceShift" class="form-label">Shift</label>
+              <select class="form-select" id="attendanceShift" required>
+                <option value="">-- Select Shift --</option>
+                <option value="General">General</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+              </select>
+            </div>
+          </div>
+          {% for emp_id, info in employees.items() %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="{{ emp_id }}" checked>
+            <label class="form-check-label" for="{{ emp_id }}">
+              {{ info.name }} ({{ emp_id }}) - Efficiency: {{ info.efficiency }} , (Skills: {{ info.trained_skills }})
+            </label>
+          </div>
+          {% endfor %}
+          <button type="submit" class="btn btn-success mt-3">Save Attendance</button>
+        </form>
+        <div id="attendanceStatus" class="mt-3"></div>
+      </div>
+
+      <div class="tab-pane fade" id="production">
+        <h3>Plan Today's Production</h3>
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label for="productionDate" class="form-label">Date</label>
+            <input type="date" class="form-control" id="productionDate" required>
+          </div>
+          <div class="col-md-6">
+            <label for="productionShift" class="form-label">Shift</label>
+            <select class="form-select" id="productionShift" required>
+              <option value="">-- Select Shift --</option>
+              <option value="General">General</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+            </select>
+          </div>
+        </div>
+        <div id="partsList">
+          <div class="part-row mb-3 p-3 border rounded">
+            <div class="row">
+              <div class="col-md-4">
+                <select class="form-select part-select">
+                  <option value="">-- Select Part --</option>
+                  {% for part_id, info in parts.items() %}
+                  <option value="{{ part_id }}">{{ info.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-3">
+                <input type="number" class="form-control quantity" placeholder="Quantity" min="1" value="10">
+              </div>
+              <div class="col-md-3">
+                <select class="form-select workarea">
+                  <option value="">-- Select Work area --</option>
+                  {% for info in header %}
+                  <option value="{{ info }}">{{ info }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-2">
+                <button type="button" class="btn btn-danger btn-sm remove-part">Remove</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button id="addPart" class="btn btn-primary mb-3">+ Add Another Part</button>
+        <br>
+        <button id="generatePlan" class="btn btn-lg btn-success">Generate Operator Assignment</button>
+      </div>
+
+      <div class="tab-pane fade" id="efficiency">
+        <h3>Efficiency Calculator</h3>
+        <div id="efficiencyResult"></div>
+      </div>
+
+      <div class="tab-pane fade" id="material">
+        <h3>Material Consumption Log</h3>
+        <form id="materialForm">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                  <label for="materialDate" class="form-label">Date</label>
+                  <input type="date" class="form-control" id="materialDate" required>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered align-middle text-center">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 15%">PROGRAM</th>
+                            <th style="width: 20%">PART NO</th>
+                            <th style="width: 10%">QTY</th>
+                            <th style="width: 10%">UNIT</th>
+                            <th style="width: 10%">REQ</th>
+                            <th style="width: 15%">ACTUAL</th>
+                            <th style="width: 20%">NAME SUPERVISOR</th>
+                            <th style="width: 20%">EFFICIENCY</th>
+                        </tr>
+                    </thead>
+                    <tbody id="materialTableBody">
+                        {# Format: (Program Name, Unit, Base Requirement Per Item) #}
+                        {% set programs = [
+                            ('C130J', 'NO', 30), 
+                            ('AA64', 'SQ.FT', 40), 
+                            ('C295 (MLG)', 'NO', 25), 
+                            ('C295 (RAMP)', 'NO', 50),
+                            ('C295 (DOOR)', 'NO', 20)
+                        ] %}
+                        
+                        {% for prog, unit, base_req in programs %}
+                        <tr class="material-row" data-program="{{ prog }}" data-base-req="{{ base_req }}">
+                            <td class="fw-bold text-primary">{{ prog }}</td>
+                            <td>
+                                <select class="form-select material-part">
+                                    <option value="">Select</option>
+                                    {% for part_id, info in parts.items() %}
+                                    <option value="{{ part_id }}">{{ info.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <input type="number" class="form-control material-qty calc-input" placeholder="No." min="0">
+                            </td>
+                            <td>{{ unit }}</td>
+                            <td class="bg-light fw-bold">
+                                <span class="req-display">0</span>
+                            </td> 
+                            <td>
+                                <input type="number" class="form-control material-actual calc-input" placeholder="Type" min="0">
+                            </td>
+                            <td>
+                                <select class="form-select material-sup">
+                                    <option value="">Select</option>
+                                    {% for emp_id, info in employees.items() %}
+                                    <option value="{{ info.name }}">{{ info.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td class="fw-bold">
+                                <span class="eff-display">0%</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg mt-3">Save Material Data</button>
+        </form>
+        <div id="materialStatus" class="mt-3"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Attendance Save
+    document.getElementById("attendanceForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const data = {};
+      document.querySelectorAll("#attendanceForm input[type=checkbox]").forEach(cb => {
+        data[cb.id] = cb.checked;
+      });
+      data.date = document.getElementById("attendanceDate").value;
+      data.shift = document.getElementById("attendanceShift").value;
+
+      fetch("/mark_attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      })
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("attendanceStatus").innerHTML =
+            `<div class="alert alert-success">Attendance saved! ${Object.values(data.attendance).filter(v => v).length} present.</div>`;
+        });
+    });
+
+    // Add new part row
+    document.getElementById("addPart").addEventListener("click", function () {
+      const template = document.querySelector(".part-row").cloneNode(true);
+      template.querySelectorAll("input, select").forEach(el => {
+        el.value = el.classList.contains("quantity") ? "10" : el.classList.contains("workarea") ? "prefit" : "";
+      });
+      document.getElementById("partsList").appendChild(template);
+    });
+
+    // Remove part row
+    document.addEventListener("click", function (e) {
+      if (e.target.classList.contains("remove-part")) {
+        if (document.querySelectorAll(".part-row").length > 1) {
+          e.target.closest(".part-row").remove();
+        }
+      }
+    });
+
+    // Generate Plan
+    document.getElementById("generatePlan").addEventListener("click", function () {
+      const parts = [];
+      document.querySelectorAll(".part-row").forEach(row => {
+        const select = row.querySelector(".part-select");
+        const qty = row.querySelector(".quantity").value;
+        const area = row.querySelector(".workarea").value;
+        if (select.value && qty > 0) {
+          parts.push({
+            part_id: select.value,
+            quantity: qty,
+            work_area: area
+          });
+        }
+      });
+
+      if (parts.length === 0) {
+        alert("Please select at least one part with quantity");
+        return;
+      }
+
+      const date = document.getElementById('productionDate').value;
+      const shift = document.getElementById('productionShift').value;
+
+      fetch("/plan_production", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parts, date, shift })
+      })
+        .then(res => res.json())
+        .then(data => {
+          let html = `<h4 class="text-success">Operator Assignment (Total Present: ${data.present_count})</h4>
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>Part Name</th>
+              <th>Quantity</th>
+              <th>Area</th>
+              <th>Operators</th>
+              <th>Actual Quantity</th>
+              <th>Efficiency</th>
+            </tr>
+          </thead>
+          <tbody>`;
+          data.assignments.forEach(task => {
+            const operators = task.operators.map(op => `${op.best_operator}, ${op.support_operator}`).join('<br>');
+            html += `<tr>
+            <td>${task.part}</td>
+            <td>${task.quantity}</td>
+            <td>${task.work_area}</td>
+            <td>${operators}</td>
+            <td><input type="number" class="form-control actual-qty" data-total="${task.quantity}" min="0" value="0"></td>
+            <td class="efficiency">0%</td>
+          </tr>`;
+          });
+          html += `</tbody></table>`;
+          document.getElementById("efficiencyResult").innerHTML = html;
+
+          // Add event listeners for efficiency calculation
+          document.querySelectorAll('.actual-qty').forEach(input => {
+            input.addEventListener('input', function () {
+              const total = parseInt(this.dataset.total);
+              const actual = parseInt(this.value) || 0;
+              const eff = ((actual / total) * 100).toFixed(2);
+              this.closest('tr').querySelector('.efficiency').textContent = `${eff}%`;
+            });
+          });
+
+          // Switch to efficiency tab
+          const efficiencyTab = new bootstrap.Tab(document.querySelector('#efficiency-tab'));
+          efficiencyTab.show();
+        });
+    });
+
+// --- Material Consumption Logic ---
+
+    // 1. Dynamic Calculation Logic
+    document.getElementById("materialTableBody").addEventListener("input", function(e) {
+        if (e.target.classList.contains("calc-input")) {
+            const row = e.target.closest("tr");
+            
+            // Get inputs
+            const baseReq = parseFloat(row.getAttribute("data-base-req")) || 0;
+            const qtyInput = row.querySelector(".material-qty");
+            const actualInput = row.querySelector(".material-actual");
+            
+            const qty = parseFloat(qtyInput.value) || 0;
+            const actual = parseFloat(actualInput.value) || 0;
+
+            // Calculate Required (Base * Qty)
+            const totalReq = baseReq * qty;
+            row.querySelector(".req-display").textContent = totalReq;
+
+            // Calculate Efficiency (Actual / Required * 100)
+            let efficiency = 0;
+            if (totalReq > 0 && actual > 0) {
+                efficiency = (actual / totalReq) * 100;
+            } else if (actual > 0 && totalReq === 0) {
+                efficiency = 100; // Edge case
+            }
+            
+            // Update UI with color coding
+            const effSpan = row.querySelector(".eff-display");
+            effSpan.textContent = efficiency.toFixed(2) + "%";
+            
+            if(efficiency > 100) effSpan.className = "eff-display text-danger";
+            else if(efficiency > 0) effSpan.className = "eff-display text-success";
+            else effSpan.className = "eff-display";
+        }
+    });
+
+    // 2. Save Logic
+    document.getElementById("materialForm").addEventListener("submit", function(e) {
+        e.preventDefault();
+        const date = document.getElementById("materialDate").value;
+        if (!date) { alert("Please select a date"); return; }
+
+        const materialData = [];
+        
+        document.querySelectorAll(".material-row").forEach(row => {
+            const program = row.getAttribute("data-program");
+            const partSelect = row.querySelector(".material-part");
+            const qty = row.querySelector(".material-qty").value;
+            const req = row.querySelector(".req-display").textContent; // Get calculated text
+            const actual = row.querySelector(".material-actual").value;
+            const supervisor = row.querySelector(".material-sup").value;
+            const efficiency = row.querySelector(".eff-display").textContent;
+
+            // Only send rows where a Part is selected AND quantity > 0
+            if(partSelect.value && qty) {
+                materialData.push({
+                    program: program,
+                    part_id: partSelect.value,
+                    part_name: partSelect.options[partSelect.selectedIndex].text,
+                    qty: qty,
+                    req: req,
+                    actual: actual,
+                    supervisor: supervisor,
+                    efficiency: efficiency
+                });
+            }
+        });
+
+        if (materialData.length === 0) {
+            alert("Please fill in at least one row (Select Part & Quantity).");
+            return;
+        }
+
+        fetch("/save_material", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ date: date, materials: materialData })
+        })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById("materialStatus").innerHTML = 
+                `<div class="alert alert-success">Saved ${data.count} records successfully!</div>`;
+        })
+        .catch(err => {
+             console.error(err);
+             document.getElementById("materialStatus").innerHTML = `<div class="alert alert-danger">Error saving data.</div>`;
+        });
+    });
+      </script>
+</body>
+
+</html>
